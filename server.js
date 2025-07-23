@@ -10,6 +10,7 @@ const { authenticate } = require('./src/utils/authorization/authenticate');
 const { stat } = require('fs');
 const { type } = require('os');
 const assert = require('assert');
+const { text } = require('stream/consumers');
 
 const app = express(); // ✅ Use express only after importing
 
@@ -46,9 +47,60 @@ app.get('/api-health', async (req, res) => {
             error: process.env.NODE_ENV === 'development' ? error.message : 'Server error'
         });
     }
+});
+
+
+app.post('/add-services', async (req, res) => {
+
+    const { services_name, description, status, api_url } = req.body;
+    if (!req.body || Object.keys(req.body).length === 0) {
+        return res.status(400).json({ message: 'No data provided' });
+    }
+
+    if (!services_name || !description || status === undefined || !api_url) {
+        return res.status(400).json({ message: 'All fields are required' })
+    }
+    if (typeof status !== 'boolean') {
+        return res.status(400).json({ message: 'Status must be a boolean value' });
+    }
+    const allowedfields = ['services_name', 'description', 'status', 'api_url'];
+    const fields = Object.keys(req.body);
+    const notAllowedFields = fields.filter(field => !allowedfields.includes(field));
+    if (notAllowedFields.length > 0) {
+        return res.status(400).json({ message: `Invalid fields: ${notAllowedFields.join(', ')}` });
+    }
+
+
+    const trimmedServiceName = services_name.trim();
+    const trimmedDescription = description.trim();
+    const trimmedApiUrl = api_url.trim();
+
+    const isValidUrl = /^(https?:\/\/)[^\s/$.?#].[^\s]*$/i.test(trimmedApiUrl);
+    if (!isValidUrl) {
+        return res.status(400).json({ message: 'Invalid API URL format' });
+    }
+
+    try {
+        const query = {
+            text: `INSERT INTO public.services_management (services_name, description, status, api_url) VALUES ($1, $2, $3, $4) RETURNING *`,
+            values: [trimmedServiceName, trimmedDescription, status, trimmedApiUrl],
+        }
+        const result = await pool.query(query);
+        if (result.rows.length > 0) {
+            return res.status(201).json({
+                message: 'Service added successfully',
+                service: result.rows[0]
+            });
+        } else {
+            return res.status(400).json({ message: 'Failed to add service' });
+        }
+
+    } catch (error) {
+        console.error('Sever error:', error);
+        return res.status(500).json({ message: 'Internal server error in product added', error: error.message });
+    }
+
 })
-
-
 
 
 
