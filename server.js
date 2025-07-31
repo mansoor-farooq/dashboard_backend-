@@ -165,7 +165,73 @@ app.get('/get-services', async (req, res) => {
 });
 
 
+// app.get('/search-services', async (req, res) => {
+//     console.log("reg query ", req.query);
+//     const { services_name, description, method } = req.query;
+//     // const services_name = req.query.services_name;
+//     // const description = req.query.description;
+//     // const method = req.query.method;
+//     const query = "SELECT * FROM servicess_menagment WHERE  services_name ='$1' "
 
+
+//     const result = await pool.query(query);
+
+//     console.log("query", query)
+//     return res.status(200).json({
+//         success: true, count: result.rows.length, data: result.rows,
+//         message: result.rows.length > 0
+//             ? 'Services fetched successfully'
+//             : 'No services name found '
+//     });
+// })
+app.get('/search-services', async (req, res) => {
+    try {
+        const { services_name, description, method } = req.query;
+
+        let conditions = [];
+        let values = [];
+        let index = 1;
+
+        if (services_name) {
+            conditions.push(`services_name ILIKE $${index}`);
+            values.push(`%${services_name}%`);
+            index++;
+        }
+
+        if (description) {
+            conditions.push(`description ILIKE $${index}`);
+            values.push(`%${description}%`);
+            index++;
+        }
+
+        if (method) {
+            conditions.push(`method ILIKE $${index}`);
+            values.push(`%${method}%`);
+            index++;
+        }
+
+        let query = 'SELECT * FROM servicess_menagment';
+        if (conditions.length > 0) {
+            query += ' WHERE ' + conditions.join(' AND ');
+        }
+        console.log("query", query);
+
+        const result = await pool.query(query, values);
+
+        return res.status(200).json({
+            success: true,
+            count: result.rows.length,
+            data: result.rows,
+            message:
+                result.rows.length > 0
+                    ? 'Services fetched successfully'
+                    : 'No matching services found',
+        });
+    } catch (error) {
+        console.error('Error:', error);
+        return res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
 
 
 //routes end --
